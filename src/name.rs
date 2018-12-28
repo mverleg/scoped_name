@@ -1,9 +1,6 @@
-use mango::towasm::util::pool::RawNamePool;
-use mango::towasm::Wasm;
+
 use regex::Regex;
 use std::cell::RefCell;
-use std::fs::File;
-use std::io::Error;
 use std::rc::Rc;
 
 //todo: Should the name be connected to the scope it is defined in?
@@ -83,20 +80,10 @@ impl RawName {}
 
 pub type Name = Rc<RefCell<RawName>>;
 
-impl Wasm for RawName {
-    fn as_wat(&self) -> String {
-        unimplemented!() // todo
-    }
-
-    fn write_wasm(&self, file: &mut File) -> Result<(), Error> {
-        unimplemented!() // todo
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use mango::towasm::util::RawName;
     use std::mem::size_of;
+    use crate::name::RawName;
 
     #[test]
     fn test_name_size() {

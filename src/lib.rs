@@ -16,6 +16,10 @@
 mod name;
 pub use self::name::{KnownName, Name, PendingName, RawName};
 
+pub mod pool;
+pub mod playground;
+pub mod util;
+
 #[cfg(test)]
 mod tests {
     #[test]
