@@ -1,3 +1,6 @@
+
+//TODO @mark: delete 'old' directory
+
 /// This infrastructure is for generating identifiers for constructs that are anonymous
 /// There are several requirements:
 /// * Names can repeat for sibling scopes, but no shadowing of parents.
