@@ -22,11 +22,6 @@ impl KnownName {
     //    }
 }
 
-pub struct NameQ {
-    pool: RawNamePool,
-    id: u32,
-}
-
 pub struct PendingName {
     /// Prefix can be empty
     prefix: String,
