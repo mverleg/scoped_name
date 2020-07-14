@@ -54,13 +54,13 @@ impl RootScope {
         scopes.push(scope_data);
         Scope {
             root: self.clone(),
-            index: self.root_data.scopes.borrow().len() - 1,
+            index: scopes.len() - 1,
         }
     }
 
     /// Look up a scope in the arena.
     fn scope_data_at<T>(&self, index: usize, accessor: impl FnOnce(&mut ScopeData) -> T) -> T {
-        accessor(&mut self.root_data.scopes.borrow()[index])
+        accessor(&mut self.root_data.scopes.borrow_mut()[index])
     }
 }
 
@@ -117,14 +117,15 @@ impl Scope {
     pub fn add_child(&mut self) -> Self {
         // During this method, the state is not consistent.
         // Step 1: add the new scope data to the root 'arena'.
-        let child_scope = self.root.add_scope(ScopeData {
-            parent: Some(self.index),
-            children: vec![],
-        });
+        let child_scope = {
+            self.root.add_scope(ScopeData {
+                parent: Some(self.index),
+                children: vec![],
+            })
+        };
         // Step 2: register that this is a child.
         self.root.scope_data_at(self.index,
             |data| data.children.push(child_scope.index));
-        // Step 3: create and return scope.
         child_scope
     }
 }
@@ -135,6 +136,10 @@ mod tests {
 
     #[test]
     fn create_root() {
-        RootScope::new_root();
+        let mut root = RootScope::new_root();
+        let child1 = root.add_child();
+        let mut child2 = root.add_child();
+        let child2a = child2.add_child();
+        let child2b = child2.add_child();
     }
 }
