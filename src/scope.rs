@@ -12,12 +12,12 @@ use ::std::collections::HashSet;
 use ::std::hash;
 use ::std::rc::Rc;
 use ::std::sync::atomic::AtomicUsize;
+use ::std::sync::atomic::Ordering::Relaxed;
 
 use ::lazy_static::lazy_static;
 use ::string_interner::StringInterner;
 
-use crate::name::{Name, InputName};
-use std::sync::atomic::Ordering::Relaxed;
+use crate::name::{InputName, Name};
 
 lazy_static! {
     static ref COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -57,7 +57,8 @@ impl RootScope {
             .push(ScopeData {
                 parent: None,
                 children: vec![],
-                names: HashSet::new(),
+                given_names: HashSet::new(),
+                anon_names: vec![],
             });
         Scope {
             root: root.clone(),
@@ -111,7 +112,8 @@ pub struct Scope {
 pub struct ScopeData {
     parent: Option<usize>,
     children: Vec<usize>,
-    names: HashSet<Name>,
+    given_names: HashSet<Name>,
+    anon_names: Vec<Name>,
 }
 
 impl PartialEq for Scope {
@@ -179,7 +181,8 @@ impl Scope {
             self.root.add_scope(ScopeData {
                 parent: Some(self.index),
                 children: vec![],
-                names: HashSet::new(),
+                given_names: HashSet::new(),
+                anon_names: vec![],
             })
         };
         // Step 2: register that this is a child.
@@ -204,11 +207,31 @@ impl Scope {
         };
         // Step 3: register this name on the scope.
         let is_new = self.root.scope_data_at(self.index,
-            |data| data.names.insert(name.clone()));
+            |data| data.given_names.insert(name.clone()));
         // Step 4: return the name only if it was a new name.
         if !is_new {
             return Err(AlreadyExists())
         }
+        Ok(name)
+    }
+
+    /// Register an anonymous identifier with a prefix in this scope.
+    pub fn add_prefix(&self, name: impl Into<String>) -> Result<Name, AlreadyExists> {
+        // During this method, the state is not consistent.
+        // Step 1: add the text to the root 'arena'.
+        let name_index = {
+            self.root.add_text(name)
+        };
+        // Step 2: create the name instance.
+        let name = Name {
+            scope: (*self).clone(),
+            data: InputName::Prefixed {
+                index: name_index,
+            }
+        };
+        // Step 3: register this name on the scope.
+        self.root.scope_data_at(self.index,
+            |data| data.anon_names.push(name.clone()));
         Ok(name)
     }
 

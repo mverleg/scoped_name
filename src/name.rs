@@ -61,6 +61,21 @@ mod tests {
     use super::*;
 
     #[test]
+    fn different_variant() {
+        unimplemented!();
+        // let mut scope = RootScope::new_root();
+        // let name1 = scope.add_named("hello").unwrap();
+        // let name2 = scope.add_named("world").unwrap();
+        // assert_eq!(name1, name1);
+        // assert_eq!(name2, name2.clone());
+        // assert_ne!(name1, name2);
+        // let mut set = HashSet::new();
+        // assert!(set.insert(name1.clone()));
+        // assert!(set.insert(name2));
+        // assert!(!set.insert(name1));
+    }
+
+    #[test]
     fn different_text() {
         let mut scope = RootScope::new_root();
         let name1 = scope.add_named("hello").unwrap();
