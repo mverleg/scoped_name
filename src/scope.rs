@@ -9,6 +9,7 @@
 
 use ::std::cell::RefCell;
 use ::std::collections::HashSet;
+use ::std::fmt;
 use ::std::hash;
 use ::std::rc::Rc;
 use ::std::sync::atomic::AtomicUsize;
@@ -17,7 +18,7 @@ use ::std::sync::atomic::Ordering::Relaxed;
 use ::lazy_static::lazy_static;
 use ::string_interner::StringInterner;
 
-use crate::name::{InputName, Name, AnonName, GivenName};
+use crate::name::{AnonName, GivenName, InputName, Name};
 
 lazy_static! {
     static ref COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -29,7 +30,6 @@ pub struct RootScope {
     root_data: Rc<RootScopeData>,
 }
 
-#[derive(Debug)]
 struct RootScopeData {
     // This number just exists for equality/hash, so that each RootScope is equal
     // if it points to the same RootScopeData. Perhaps this could have been done
@@ -41,6 +41,16 @@ struct RootScopeData {
     scopes: RefCell<Vec<ScopeData>>,
     // I decided to not expose the Scope of the root for now. If it's desired after
     // all, it can be obtained by relying on the convention that scopes[0] is the root.
+}
+
+impl fmt::Debug for RootScopeData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RootScopeData {{ ")?;
+        write!(f, "nr: {}, ", self.nr)?;
+        write!(f, "scopes: {}, ", self.scopes.borrow().len())?;
+        write!(f, "names: {}", self.names.borrow().len())?;
+        write!(f, " }}")
+    }
 }
 
 impl RootScope {
