@@ -9,7 +9,7 @@ pub struct Name {
     data: InputName,
 }
 
-#[derive(Debug, Eq)]
+#[derive(Debug)]
 enum InputName {
     /// A given identifier that should not collide.
     Given {
@@ -37,6 +37,8 @@ impl PartialEq for InputName {
         return false;
     }
 }
+
+impl Eq for InputName {}
 
 impl hash::Hash for InputName {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {

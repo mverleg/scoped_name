@@ -1,4 +1,3 @@
-
 /// This files defines a root scope, and a tree of scopes below it.
 ///
 /// Scopes can be cloned to pass around whenever borrowing is not convenient; it is
@@ -9,13 +8,19 @@
 /// reclaimed until the last scope is dropped (which drops the root along with data).
 
 use ::std::cell::RefCell;
+use ::std::collections::HashSet;
 use ::std::rc::Rc;
+use std::hash;
 
 use ::string_interner::StringInterner;
-use crate::name::Name;
-use std::collections::HashSet;
 
-#[derive(Debug, Clone)]
+use crate::name::Name;
+
+lazy_static! {
+    mut static ref COUNTER: usize = 0;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RootScope {
     // This prevents us from needing
     root_data: Rc<RootScopeData>,
@@ -23,6 +28,11 @@ pub struct RootScope {
 
 #[derive(Debug)]
 struct RootScopeData {
+    // This number just exists for equality/hash, so that each RootScope is equal
+    // if it points to the same RootScopeData. Perhaps this could have been done
+    // with pointers, but for now I'm not confident I understand the guarantees
+    // around moving and pointers and optimizations well enough for that.
+    nr: usize,
     //TODO @mark: names & interning incomplete
     names: RefCell<StringInterner<usize>>,
     scopes: RefCell<Vec<ScopeData>>,
@@ -35,6 +45,7 @@ impl RootScope {
     pub fn new_root() -> Scope {
         let root = RootScope {
             root_data: Rc::new(RootScopeData {
+                nr: { COUNTER += 1; COUNTER },
                 names: RefCell::new(StringInterner::new()),
                 scopes: RefCell::new(vec![]),
             }),
@@ -73,17 +84,46 @@ impl RootScope {
     }
 }
 
-#[derive(Debug, Clone)]
+impl PartialEq for RootScopeData {
+    fn eq(&self, other: &Self) -> bool {
+        self.nr == other.nr
+    }
+}
+
+impl Eq for RootScopeData {}
+
+impl hash::Hash for RootScopeData {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.nr.hash(state)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Scope {
     root: RootScope,
     index: usize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ScopeData {
     parent: Option<usize>,
     children: Vec<usize>,
     names: HashSet<Name>,
+}
+
+impl PartialEq for Scope {
+    fn eq(&self, other: &Self) -> bool {
+        self.nr == other.nr
+    }
+}
+
+impl Eq for Scope {}
+
+impl hash::Hash for Scope {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.root.nr.hash(state);
+        self.index.hash(state)
+    }
 }
 
 #[derive(Debug)]

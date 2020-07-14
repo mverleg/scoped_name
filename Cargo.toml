@@ -5,5 +5,6 @@ authors = ["Mark <mverleg.noreply@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+lazy_static = "^1.4.0"
 string-interner = "^0.7.1"
 #regex = { version = "1.1.0" }
