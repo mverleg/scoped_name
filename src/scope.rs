@@ -8,14 +8,10 @@
 /// contiguously inside the root scope. This does mean that no memory will be
 /// reclaimed until the last scope is dropped (which drops the root along with data).
 
-use ::std::borrow::BorrowMut;
 use ::std::cell::RefCell;
-use ::std::collections::HashMap;
 use ::std::rc::Rc;
 
 use ::string_interner::StringInterner;
-
-use crate::name::Name;
 
 #[derive(Debug, Clone)]
 pub struct RootScope {
@@ -35,7 +31,7 @@ struct RootScopeData {
 impl RootScope {
     /// Return a new Scope, that holds a reference to a newly created RootScope.
     pub fn new_root() -> Scope {
-        let mut root = RootScope {
+        let root = RootScope {
             root_data: Rc::new(RootScopeData {
                 names: RefCell::new(StringInterner::new()),
                 scopes: RefCell::new(vec![]),
@@ -63,8 +59,8 @@ impl RootScope {
     }
 
     /// Look up a scope in the arena.
-    fn scope_data_at<T>(&self, scope: &Scope, getter: impl FnOnce(&ScopeData) -> T) -> T {
-        getter(&self.root_data.scopes.borrow()[scope.index])
+    fn scope_data_at<T>(&self, index: usize, accessor: impl FnOnce(&mut ScopeData) -> T) -> T {
+        accessor(&mut self.root_data.scopes.borrow()[index])
     }
 }
 
@@ -81,44 +77,55 @@ pub struct ScopeData {
 }
 
 #[derive(Debug)]
-struct ScopeIterator {
+struct ScopeChildrenIterator {
     scope: Scope,
-    child_index: usize,
+    // Note: `child_nr` is the index within `.children`, not within the 'arena'.
+    child_nr: usize,
 }
 
-impl Iterator for ScopeIterator {
+impl Iterator for ScopeChildrenIterator {
     type Item = Scope;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let children = self.scope.root.scope_data_at(&self.scope, |data| data.children);
-        if self.child_index >= children.len() {
-            return None
+        // Convert the .children-index into arena-index.
+        let child_index = self.scope.root.scope_data_at(self.scope.index,
+            |data| data.children.get(self.child_nr).cloned());
+        match child_index {
+            Some(child_index) => {
+                // Create a Scope for that index.
+                let scope = Scope {
+                    root: self.scope.root.clone(),
+                    index: child_index,
+                };
+                // Make sure the next iteration returns the next child.
+                self.child_nr += 1;
+                Some(scope)
+            },
+            None => None,
         }
-        let scope = Scope {
-            root: self.scope.root.clone(),
-            index: children[self.child_index],
-        };
-        self.child_index += 1;
-        Some(scope)
     }
 }
 
 impl Scope {
-    pub fn children(&self) -> ScopeIterator {
-        unimplemented!()
+    pub fn children(&self) -> ScopeChildrenIterator {
+        ScopeChildrenIterator {
+            scope: self.clone(),
+            child_nr: 0,
+        }
     }
 
     pub fn add_child(&mut self) -> Self {
         // During this method, the state is not consistent.
         // Step 1: add the new scope data to the root 'arena'.
-        let child = self.root.add_scope(ScopeData {
+        let child_scope = self.root.add_scope(ScopeData {
             parent: Some(self.index),
             children: vec![],
         });
         // Step 2: register that this is a child.
-
-
-        unimplemented!()
+        self.root.scope_data_at(self.index,
+            |data| data.children.push(child_scope.index));
+        // Step 3: create and return scope.
+        child_scope
     }
 }
 
