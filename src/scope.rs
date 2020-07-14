@@ -160,6 +160,9 @@ impl Iterator for ScopeChildrenIterator {
     }
 }
 
+#[derive(Debug)]
+pub struct AlreadyExists();
+
 impl Scope {
     pub fn children(&self) -> ScopeChildrenIterator {
         ScopeChildrenIterator {
@@ -169,7 +172,7 @@ impl Scope {
     }
 
     /// Connect a child scope to this one.
-    pub fn add_child(&mut self) -> Self {
+    pub fn add_child(&self) -> Self {
         // During this method, the state is not consistent.
         // Step 1: add the new scope data to the root 'arena'.
         let child_scope = {
@@ -186,7 +189,7 @@ impl Scope {
     }
 
     /// Register a named identifier in this scope, failing if it is already registered.
-    pub fn add_named(&mut self, name: impl Into<String>) -> Result<Name, ()> {
+    pub fn add_named(&self, name: impl Into<String>) -> Result<Name, AlreadyExists> {
         // During this method, the state is not consistent.
         // Step 1: add the text to the root 'arena'.
         let name_index = {
@@ -200,11 +203,11 @@ impl Scope {
             }
         };
         // Step 3: register this name on the scope.
-        let is_pre_existing = self.root.scope_data_at(self.index,
+        let is_new = self.root.scope_data_at(self.index,
             |data| data.names.insert(name.clone()));
         // Step 4: return the name only if it was a new name.
-        if is_pre_existing {
-            return Err(())
+        if !is_new {
+            return Err(AlreadyExists())
         }
         Ok(name)
     }
@@ -226,5 +229,25 @@ mod tests {
         let mut child2 = root.add_child();
         let child2a = child2.add_child();
         let child2b = child2.add_child();
+    }
+
+    #[test]
+    fn add_named_unique() {
+        let mut root = RootScope::new_root();
+        let name1 = root.add_named("hello").unwrap();
+        let name2 = root.add_named("bye").unwrap();
+        let mut child1 = root.add_child();
+        let name3 = child1.add_named("nihao").unwrap();
+    }
+
+    #[test]
+    fn add_named_duplicate() {
+        let mut root = RootScope::new_root();
+        let name1 = root.add_named("hello").unwrap();
+        let mut child1 = root.add_child();
+        // This is shadowing (in different scope) and is allowed:
+        let name2 = child1.add_named("hello").unwrap();
+        // This is a duplicate (in the same scope) and should fail:
+        let failure = child1.add_named("hello").unwrap_err();
     }
 }

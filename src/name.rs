@@ -51,3 +51,57 @@ impl hash::Hash for InputName {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use ::std::collections::HashSet;
+
+    use crate::scope::RootScope;
+
+    use super::*;
+
+    #[test]
+    fn different_text() {
+        let mut scope = RootScope::new_root();
+        let name1 = scope.add_named("hello").unwrap();
+        let name2 = scope.add_named("world").unwrap();
+        assert_eq!(name1, name1);
+        assert_eq!(name2, name2.clone());
+        assert_ne!(name1, name2);
+        let mut set = HashSet::new();
+        assert!(set.insert(name1.clone()));
+        assert!(set.insert(name2));
+        assert!(!set.insert(name1));
+    }
+
+    #[test]
+    fn different_scope() {
+        let mut scope = RootScope::new_root();
+        let child1 = scope.add_child();
+        let name1 = child1.add_named("hello").unwrap();
+        let child2 = scope.add_child();
+        let name2 = child2.add_named("hello").unwrap();
+        assert_eq!(name1, name1);
+        assert_eq!(name2, name2.clone());
+        assert_ne!(name1, name2);
+        let mut set = HashSet::new();
+        assert!(set.insert(name1.clone()));
+        assert!(set.insert(name2));
+        assert!(!set.insert(name1));
+    }
+
+    #[test]
+    fn different_root() {
+        let mut scope1 = RootScope::new_root();
+        let mut scope2 = RootScope::new_root();
+        let name1 = scope1.add_named("hello").unwrap();
+        let name2 = scope2.add_named("hello").unwrap();
+        assert_eq!(name1, name1);
+        assert_eq!(name2, name2.clone());
+        assert_ne!(name1, name2);
+        let mut set = HashSet::new();
+        assert!(set.insert(name1.clone()));
+        assert!(set.insert(name2));
+        assert!(!set.insert(name1));
+    }
+}
