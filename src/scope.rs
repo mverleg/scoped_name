@@ -9,15 +9,18 @@
 
 use ::std::cell::RefCell;
 use ::std::collections::HashSet;
+use ::std::hash;
 use ::std::rc::Rc;
-use std::hash;
+use ::std::sync::atomic::AtomicUsize;
 
+use ::lazy_static::lazy_static;
 use ::string_interner::StringInterner;
 
-use crate::name::Name;
+use crate::name::{Name, InputName};
+use std::sync::atomic::Ordering::Relaxed;
 
 lazy_static! {
-    mut static ref COUNTER: usize = 0;
+    static ref COUNTER: AtomicUsize = AtomicUsize::new(0);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -45,7 +48,7 @@ impl RootScope {
     pub fn new_root() -> Scope {
         let root = RootScope {
             root_data: Rc::new(RootScopeData {
-                nr: { COUNTER += 1; COUNTER },
+                nr: COUNTER.fetch_add(1, Relaxed),
                 names: RefCell::new(StringInterner::new()),
                 scopes: RefCell::new(vec![]),
             }),
@@ -98,7 +101,7 @@ impl hash::Hash for RootScopeData {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub struct Scope {
     root: RootScope,
     index: usize,
@@ -113,7 +116,8 @@ pub struct ScopeData {
 
 impl PartialEq for Scope {
     fn eq(&self, other: &Self) -> bool {
-        self.nr == other.nr
+        self.index == other.index &&
+            self.root == other.root
     }
 }
 
@@ -121,13 +125,13 @@ impl Eq for Scope {}
 
 impl hash::Hash for Scope {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.root.nr.hash(state);
+        self.root.hash(state);
         self.index.hash(state)
     }
 }
 
 #[derive(Debug)]
-struct ScopeChildrenIterator {
+pub struct ScopeChildrenIterator {
     scope: Scope,
     // Note: `child_nr` is the index within `.children`, not within the 'arena'.
     child_nr: usize,
@@ -189,13 +193,20 @@ impl Scope {
             self.root.add_text(name)
         };
         // Step 2: create the name instance.
-        let name = InputName::Given {
-            index: name_index,
+        let name = Name {
+            scope: (*self).clone(),
+            data: InputName::Given {
+                index: name_index,
+            }
         };
-        // Step 3: register that this is a child.
-        self.root.scope_data_at(self.index,
-            |data| data.children.push(child_scope.index));
-        child_scope
+        // Step 3: register this name on the scope.
+        let is_pre_existing = self.root.scope_data_at(self.index,
+            |data| data.names.insert(name.clone()));
+        // Step 4: return the name only if it was a new name.
+        if is_pre_existing {
+            return Err(())
+        }
+        Ok(name)
     }
 
     /// Register an anonymous identifier in this scope, possibly with a prefix.

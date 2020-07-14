@@ -1,16 +1,18 @@
-use ::std::rc::Rc;
+use ::std::hash;
 
 use crate::scope::Scope;
-use std::hash;
 
+/// An identifier, either anonymous or given.
+///
+/// Instances should be created through `Scope`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Name {
-    scope: Scope,
-    data: InputName,
+    pub(crate) scope: Scope,
+    pub(crate) data: InputName,
 }
 
-#[derive(Debug)]
-enum InputName {
+#[derive(Debug, Clone)]
+pub(crate) enum InputName {
     /// A given identifier that should not collide.
     Given {
         // Index in the scope's string 'arena'.
@@ -45,7 +47,7 @@ impl hash::Hash for InputName {
         match self {
             InputName::Given { index } => index.hash(state),
             InputName::Prefixed { index } => index.hash(state),
-            InputName::Anonymous => 0.hash(state),
+            InputName::Anonymous {} => 0.hash(state),
         }
     }
 }
