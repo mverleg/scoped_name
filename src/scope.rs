@@ -17,7 +17,7 @@ use ::std::sync::atomic::Ordering::Relaxed;
 use ::lazy_static::lazy_static;
 use ::string_interner::StringInterner;
 
-use crate::name::{InputName, Name};
+use crate::name::{InputName, Name, AnonName, GivenName};
 
 lazy_static! {
     static ref COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -36,7 +36,7 @@ struct RootScopeData {
     // with pointers, but for now I'm not confident I understand the guarantees
     // around moving and pointers and optimizations well enough for that.
     nr: usize,
-    //TODO @mark: names & interning incomplete
+    //TODO @mark: it might actually be better to just make name cache global or thread-local-global, names probably re-appear in different program units (would delay memory cleanup though).
     names: RefCell<StringInterner<usize>>,
     scopes: RefCell<Vec<ScopeData>>,
     // I decided to not expose the Scope of the root for now. If it's desired after
@@ -46,6 +46,7 @@ struct RootScopeData {
 impl RootScope {
     /// Return a new Scope, that holds a reference to a newly created RootScope.
     pub fn new_root() -> Scope {
+        // Create the root element.
         let root = RootScope {
             root_data: Rc::new(RootScopeData {
                 nr: COUNTER.fetch_add(1, Relaxed),
@@ -53,6 +54,7 @@ impl RootScope {
                 scopes: RefCell::new(vec![]),
             }),
         };
+        // Create ScopeData for the root element.
         root.root_data.scopes.borrow_mut()
             .push(ScopeData {
                 parent: None,
@@ -60,6 +62,7 @@ impl RootScope {
                 given_names: HashSet::new(),
                 anon_names: vec![],
             });
+        // Return a Scope pointing to that element.
         Scope {
             root: root.clone(),
             index: 0,
@@ -112,8 +115,8 @@ pub struct Scope {
 pub struct ScopeData {
     parent: Option<usize>,
     children: Vec<usize>,
-    given_names: HashSet<Name>,
-    anon_names: Vec<Name>,
+    given_names: HashSet<GivenName>,
+    anon_names: Vec<AnonName>,
 }
 
 impl PartialEq for Scope {
@@ -194,50 +197,51 @@ impl Scope {
     /// Register a named identifier in this scope, failing if it is already registered.
     pub fn add_named(&self, name: impl Into<String>) -> Result<Name, AlreadyExists> {
         // During this method, the state is not consistent.
-        // Step 1: add the text to the root 'arena'.
+        // Add the text to the root 'arena'.
         let name_index = {
             self.root.add_text(name)
         };
-        // Step 2: create the name instance.
-        let name = Name {
-            scope: (*self).clone(),
-            data: InputName::Given {
-                index: name_index,
-            }
+        // Create the name instance.
+        let given_name = GivenName {
+            index: name_index,
         };
-        // Step 3: register this name on the scope.
+        // Register this name on the scope.
         let is_new = self.root.scope_data_at(self.index,
-            |data| data.given_names.insert(name.clone()));
-        // Step 4: return the name only if it was a new name.
+            |data| data.given_names.insert(given_name.clone()));
+        // Return the name only if it was a new name.
         if !is_new {
             return Err(AlreadyExists())
         }
-        Ok(name)
+        Ok(Name {
+            scope: (*self).clone(),
+            data: InputName::Given(given_name),
+        })
     }
 
     /// Register an anonymous identifier with a prefix in this scope.
-    pub fn add_prefix(&self, name: impl Into<String>) -> Result<Name, AlreadyExists> {
+    pub fn add_prefixed(&self, prefix: impl Into<String>) -> Name {
         // During this method, the state is not consistent.
-        // Step 1: add the text to the root 'arena'.
+        // Add the text to the root 'arena'.
         let name_index = {
-            self.root.add_text(name)
+            self.root.add_text(prefix)
         };
-        // Step 2: create the name instance.
-        let name = Name {
-            scope: (*self).clone(),
-            data: InputName::Prefixed {
-                index: name_index,
-            }
+        // Create the name instance.
+        let anon_name = AnonName {
+            index: name_index,
         };
-        // Step 3: register this name on the scope.
+        // Register this name on the scope.
         self.root.scope_data_at(self.index,
-            |data| data.anon_names.push(name.clone()));
-        Ok(name)
+            |data| data.anon_names.push(anon_name.clone()));
+        // Wrap into Name and return.
+        Name {
+            scope: (*self).clone(),
+            data: InputName::Anonymous(anon_name),
+        }
     }
 
-    /// Register an anonymous identifier in this scope, possibly with a prefix.
-    pub fn add_anonymous<S: Into<String>>(&mut self) -> Name {
-        unimplemented!()
+    /// Register an anonymous identifier without a prefix in this scope.
+    pub fn add_anonymous(&self) -> Name {
+        self.add_prefixed("")
     }
 }
 
