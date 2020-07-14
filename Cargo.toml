@@ -5,4 +5,5 @@ authors = ["Mark <mverleg.noreply@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+string-interner = "^0.7.1"
 #regex = { version = "1.1.0" }
