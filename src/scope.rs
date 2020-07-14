@@ -12,6 +12,8 @@ use ::std::cell::RefCell;
 use ::std::rc::Rc;
 
 use ::string_interner::StringInterner;
+use crate::name::Name;
+use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
 pub struct RootScope {
@@ -41,6 +43,7 @@ impl RootScope {
             .push(ScopeData {
                 parent: None,
                 children: vec![],
+                names: HashSet::new(),
             });
         Scope {
             root: root.clone(),
@@ -56,6 +59,12 @@ impl RootScope {
             root: self.clone(),
             index: scopes.len() - 1,
         }
+    }
+
+    /// Add new name data, returning the 'arena' index.
+    fn add_text(&self, text: impl Into<String>) -> usize {
+        let mut names = self.root_data.names.borrow_mut();
+        names.get_or_intern(text.into())
     }
 
     /// Look up a scope in the arena.
@@ -74,6 +83,7 @@ pub struct Scope {
 pub struct ScopeData {
     parent: Option<usize>,
     children: Vec<usize>,
+    names: HashSet<Name>,
 }
 
 #[derive(Debug)]
@@ -114,6 +124,7 @@ impl Scope {
         }
     }
 
+    /// Connect a child scope to this one.
     pub fn add_child(&mut self) -> Self {
         // During this method, the state is not consistent.
         // Step 1: add the new scope data to the root 'arena'.
@@ -121,12 +132,35 @@ impl Scope {
             self.root.add_scope(ScopeData {
                 parent: Some(self.index),
                 children: vec![],
+                names: HashSet::new(),
             })
         };
         // Step 2: register that this is a child.
         self.root.scope_data_at(self.index,
             |data| data.children.push(child_scope.index));
         child_scope
+    }
+
+    /// Register a named identifier in this scope, failing if it is already registered.
+    pub fn add_named(&mut self, name: impl Into<String>) -> Result<Name, ()> {
+        // During this method, the state is not consistent.
+        // Step 1: add the text to the root 'arena'.
+        let name_index = {
+            self.root.add_text(name)
+        };
+        // Step 2: create the name instance.
+        let name = InputName::Given {
+            index: name_index,
+        };
+        // Step 3: register that this is a child.
+        self.root.scope_data_at(self.index,
+            |data| data.children.push(child_scope.index));
+        child_scope
+    }
+
+    /// Register an anonymous identifier in this scope, possibly with a prefix.
+    pub fn add_anonymous<S: Into<String>>(&mut self) -> Name {
+        unimplemented!()
     }
 }
 
