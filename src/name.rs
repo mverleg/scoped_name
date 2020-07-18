@@ -1,6 +1,5 @@
-use ::std::hash;
-
 use crate::scope::Scope;
+use ustr::Ustr;
 
 /// An identifier, either anonymous or given.
 ///
@@ -21,25 +20,10 @@ impl Name {
 }
 
 /// A given identifier that should not collide within a scope.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GivenName {
     // Index in the scope's string 'arena'.
-    pub(crate) index: usize,
-}
-
-impl PartialEq for GivenName {
-    fn eq(&self, other: &Self) -> bool {
-        self.index == other.index
-    }
-}
-
-/// Note that only GivenName is Eq; AnonName does not satisfy Eq, so neither does Name.
-impl Eq for GivenName {}
-
-impl hash::Hash for GivenName {
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.index.hash(state)
-    }
+    pub(crate) name: Ustr,
 }
 
 /// An anonymous identifier, optionally with a prefix.
@@ -47,7 +31,7 @@ impl hash::Hash for GivenName {
 pub struct AnonName {
     // Index in the scope's string 'arena'.
     // Empty string is used to mean 'no prefix'.
-    pub(crate) index: usize,
+    pub(crate) name: Ustr,
 }
 
 /// Only given identifiers can be equal; anonymous ones have no identifying information, so are assumed non-equal.
@@ -78,7 +62,6 @@ mod mixed {
         assert_ne!(name1, name2);
     }
 }
-
 
 #[cfg(test)]
 mod anonymous {

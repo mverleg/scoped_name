@@ -16,9 +16,9 @@ use ::std::sync::atomic::AtomicUsize;
 use ::std::sync::atomic::Ordering::Relaxed;
 
 use ::lazy_static::lazy_static;
-use ::string_interner::StringInterner;
 
 use crate::name::{AnonName, GivenName, InputName, Name};
+use ustr::Ustr;
 
 lazy_static! {
     static ref COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -37,7 +37,7 @@ struct RootScopeData {
     // around moving and pointers and optimizations well enough for that.
     nr: usize,
     //TODO @mark: it might actually be better to just make name cache global or thread-local-global, names probably re-appear in different program units (would delay memory cleanup though).
-    names: RefCell<StringInterner<usize>>,
+    //names: RefCell<StringInterner<usize>>,  //TODO @mark: TEMPORARY! REMOVE THIS!
     scopes: RefCell<Vec<ScopeData>>,
     // I decided to not expose the Scope of the root for now. If it's desired after
     // all, it can be obtained by relying on the convention that scopes[0] is the root.
@@ -48,7 +48,6 @@ impl fmt::Debug for RootScopeData {
         write!(f, "RootScopeData {{ ")?;
         write!(f, "nr: {}, ", self.nr)?;
         write!(f, "scopes: {}, ", self.scopes.borrow().len())?;
-        write!(f, "names: {}", self.names.borrow().len())?;
         write!(f, " }}")
     }
 }
@@ -60,7 +59,6 @@ impl RootScope {
         let root = RootScope {
             root_data: Rc::new(RootScopeData {
                 nr: COUNTER.fetch_add(1, Relaxed),
-                names: RefCell::new(StringInterner::new()),
                 scopes: RefCell::new(vec![]),
             }),
         };
@@ -89,12 +87,6 @@ impl RootScope {
         }
     }
 
-    /// Add new name data, returning the 'arena' index.
-    fn add_text(&self, text: impl Into<String>) -> usize {
-        let mut names = self.root_data.names.borrow_mut();
-        names.get_or_intern(text.into())
-    }
-
     /// Look up a scope in the arena.
     fn scope_data_at<T>(&self, index: usize, accessor: impl FnOnce(&mut ScopeData) -> T) -> T {
         accessor(&mut self.root_data.scopes.borrow_mut()[index])
@@ -120,6 +112,8 @@ pub struct Scope {
     root: RootScope,
     index: usize,
 }
+
+//TODO @mark: Use special UstrSet for faster hashing
 
 #[derive(Debug)]
 pub struct ScopeData {
@@ -205,16 +199,10 @@ impl Scope {
     }
 
     /// Register a named identifier in this scope, failing if it is already registered.
-    pub fn add_named(&self, name: impl Into<String>) -> Result<Name, AlreadyExists> {
+    pub fn add_named(&self, name: &str) -> Result<Name, AlreadyExists> {
         // During this method, the state is not consistent.
-        // Add the text to the root 'arena'.
-        let name_index = {
-            self.root.add_text(name)
-        };
         // Create the name instance.
-        let given_name = GivenName {
-            index: name_index,
-        };
+        let given_name = GivenName { name: Ustr::from(name) };
         // Register this name on the scope.
         let is_new = self.root.scope_data_at(self.index,
             |data| data.given_names.insert(given_name.clone()));
@@ -229,15 +217,11 @@ impl Scope {
     }
 
     /// Register an anonymous identifier with a prefix in this scope.
-    pub fn add_prefixed(&self, prefix: impl Into<String>) -> Name {
+    pub fn add_prefixed(&self, prefix: &str) -> Name {
         // During this method, the state is not consistent.
-        // Add the text to the root 'arena'.
-        let name_index = {
-            self.root.add_text(prefix)
-        };
         // Create the name instance.
         let anon_name = AnonName {
-            index: name_index,
+            name: Ustr::from(prefix),
         };
         // Register this name on the scope.
         self.root.scope_data_at(self.index,
