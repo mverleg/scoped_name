@@ -42,7 +42,7 @@ impl hash::Hash for GivenName {
     }
 }
 
-/// /// An anonymous identifier, optionally with a prefix.
+/// An anonymous identifier, optionally with a prefix.
 #[derive(Debug, Clone)]
 pub struct AnonName {
     // Index in the scope's string 'arena'.
@@ -104,8 +104,6 @@ mod anonymous {
         assert_ne!(name1, name2);
     }
 }
-
-//TODO @mark: anon tests?
 
 #[cfg(test)]
 mod given {

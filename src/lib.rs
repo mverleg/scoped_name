@@ -15,5 +15,3 @@
 
 mod name;
 mod scope;
-
-//TODO @mark: add interning

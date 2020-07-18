@@ -1,5 +1,5 @@
 [package]
-name = "scoped_name_pool"
+name = "scoped_name"
 version = "0.2.0"
 authors = ["Mark <mverleg.noreply@gmail.com>"]
 edition = "2018"
