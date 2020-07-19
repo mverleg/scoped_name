@@ -6,7 +6,6 @@
 /// It is designed to avoid excessive allocations, by storing names and sub-scopes
 /// contiguously inside the root scope. This does mean that no memory will be
 /// reclaimed until the last scope is dropped (which drops the root along with data).
-
 use ::std::cell::RefCell;
 use ::std::collections::HashSet;
 use ::std::fmt;
@@ -63,16 +62,15 @@ impl RootScope {
             }),
         };
         // Create ScopeData for the root element.
-        root.root_data.scopes.borrow_mut()
-            .push(ScopeData {
-                parent: None,
-                children: vec![],
-                given_names: HashSet::new(),
-                anon_names: vec![],
-            });
+        root.root_data.scopes.borrow_mut().push(ScopeData {
+            parent: None,
+            children: vec![],
+            given_names: HashSet::new(),
+            anon_names: vec![],
+        });
         // Return a Scope pointing to that element.
         Scope {
-            root: root.clone(),
+            root,
             index: 0,
         }
     }
@@ -125,8 +123,7 @@ pub struct ScopeData {
 
 impl PartialEq for Scope {
     fn eq(&self, other: &Self) -> bool {
-        self.index == other.index &&
-            self.root == other.root
+        self.index == other.index && self.root == other.root
     }
 }
 
@@ -151,8 +148,9 @@ impl Iterator for ScopeChildrenIterator {
 
     fn next(&mut self) -> Option<Self::Item> {
         // Convert the .children-index into arena-index.
-        let child_index = self.scope.root.scope_data_at(self.scope.index,
-            |data| data.children.get(self.child_nr).cloned());
+        let child_index = self.scope.root.scope_data_at(self.scope.index, |data| {
+            data.children.get(self.child_nr).cloned()
+        });
         match child_index {
             Some(child_index) => {
                 // Create a Scope for that index.
@@ -163,7 +161,7 @@ impl Iterator for ScopeChildrenIterator {
                 // Make sure the next iteration returns the next child.
                 self.child_nr += 1;
                 Some(scope)
-            },
+            }
             None => None,
         }
     }
@@ -193,8 +191,8 @@ impl Scope {
             })
         };
         // Step 2: register that this is a child.
-        self.root.scope_data_at(self.index,
-            |data| data.children.push(child_scope.index));
+        self.root
+            .scope_data_at(self.index, |data| data.children.push(child_scope.index));
         child_scope
     }
 
@@ -202,13 +200,16 @@ impl Scope {
     pub fn add_named(&self, name: &str) -> Result<Name, AlreadyExists> {
         // During this method, the state is not consistent.
         // Create the name instance.
-        let given_name = GivenName { name: Ustr::from(name) };
+        let given_name = GivenName {
+            name: Ustr::from(name),
+        };
         // Register this name on the scope.
-        let is_new = self.root.scope_data_at(self.index,
-            |data| data.given_names.insert(given_name.clone()));
+        let is_new = self.root.scope_data_at(self.index, |data| {
+            data.given_names.insert(given_name.clone())
+        });
         // Return the name only if it was a new name.
         if !is_new {
-            return Err(AlreadyExists())
+            return Err(AlreadyExists());
         }
         Ok(Name {
             scope: (*self).clone(),
@@ -224,8 +225,8 @@ impl Scope {
             name: Ustr::from(prefix),
         };
         // Register this name on the scope.
-        self.root.scope_data_at(self.index,
-            |data| data.anon_names.push(anon_name.clone()));
+        self.root
+            .scope_data_at(self.index, |data| data.anon_names.push(anon_name.clone()));
         // Wrap into Name and return.
         Name {
             scope: (*self).clone(),
@@ -243,32 +244,34 @@ impl Scope {
 mod tests {
     use super::*;
 
+    //TODO @mark: test children
+
     #[test]
     fn create_root() {
-        let mut root = RootScope::new_root();
-        let child1 = root.add_child();
-        let mut child2 = root.add_child();
-        let child2a = child2.add_child();
-        let child2b = child2.add_child();
+        let root = RootScope::new_root();
+        root.add_child();
+        let child2 = root.add_child();
+        child2.add_child();
+        child2.add_child();
     }
 
     #[test]
     fn add_named_unique() {
-        let mut root = RootScope::new_root();
-        let name1 = root.add_named("hello").unwrap();
-        let name2 = root.add_named("bye").unwrap();
-        let mut child1 = root.add_child();
-        let name3 = child1.add_named("nihao").unwrap();
+        let root = RootScope::new_root();
+        root.add_named("hello").unwrap();
+        root.add_named("bye").unwrap();
+        let child1 = root.add_child();
+        child1.add_named("nihao").unwrap();
     }
 
     #[test]
     fn add_named_duplicate() {
-        let mut root = RootScope::new_root();
-        let name1 = root.add_named("hello").unwrap();
-        let mut child1 = root.add_child();
+        let root = RootScope::new_root();
+        root.add_named("hello").unwrap();
+        let child1 = root.add_child();
         // This is shadowing (in different scope) and is allowed:
-        let name2 = child1.add_named("hello").unwrap();
+        child1.add_named("hello").unwrap();
         // This is a duplicate (in the same scope) and should fail:
-        let failure = child1.add_named("hello").unwrap_err();
+        child1.add_named("hello").unwrap_err();
     }
 }

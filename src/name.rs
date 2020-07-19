@@ -36,8 +36,8 @@ pub struct AnonName {
 
 /// Only given identifiers can be equal; anonymous ones have no identifying information, so are assumed non-equal.
 impl PartialEq for AnonName {
-    fn eq(&self, other: &Self) -> bool {
-        return false
+    fn eq(&self, _other: &Self) -> bool {
+        false
     }
 }
 
@@ -47,14 +47,13 @@ pub(crate) enum InputName {
     Anonymous(AnonName),
 }
 
-
 #[cfg(test)]
 mod mixed {
     use crate::scope::RootScope;
 
     #[test]
     fn different_variant() {
-        let mut scope = RootScope::new_root();
+        let scope = RootScope::new_root();
         let name1 = scope.add_prefixed("hello");
         let name2 = scope.add_named("hello").unwrap();
         assert_ne!(name1, name1);
@@ -69,7 +68,7 @@ mod anonymous {
 
     #[test]
     fn prefixed_ne() {
-        let mut scope = RootScope::new_root();
+        let scope = RootScope::new_root();
         let name1 = scope.add_prefixed("hello");
         let name2 = scope.add_prefixed("hello");
         assert_ne!(name1, name1);
@@ -79,7 +78,7 @@ mod anonymous {
 
     #[test]
     fn anonymous_ne() {
-        let mut scope = RootScope::new_root();
+        let scope = RootScope::new_root();
         let name1 = scope.add_anonymous();
         let name2 = scope.add_anonymous();
         assert_ne!(name1, name1);
@@ -96,7 +95,7 @@ mod given {
 
     #[test]
     fn different_text_ne() {
-        let mut scope = RootScope::new_root();
+        let scope = RootScope::new_root();
         let name1 = scope.add_named("hello").unwrap();
         let name2 = scope.add_named("world").unwrap();
         assert_eq!(name1, name1);
@@ -106,7 +105,7 @@ mod given {
 
     #[test]
     fn different_text_hash() {
-        let mut scope = RootScope::new_root();
+        let scope = RootScope::new_root();
         let name1 = scope.add_named("hello").unwrap().unwrap_given();
         let name2 = scope.add_named("world").unwrap().unwrap_given();
         let mut set = HashSet::new();
@@ -117,7 +116,7 @@ mod given {
 
     #[test]
     fn different_scope_ne() {
-        let mut scope = RootScope::new_root();
+        let scope = RootScope::new_root();
         let child1 = scope.add_child();
         let name1 = child1.add_named("hello").unwrap();
         let child2 = scope.add_child();
@@ -129,8 +128,8 @@ mod given {
 
     #[test]
     fn different_root_ne() {
-        let mut scope1 = RootScope::new_root();
-        let mut scope2 = RootScope::new_root();
+        let scope1 = RootScope::new_root();
+        let scope2 = RootScope::new_root();
         let name1 = scope1.add_named("hello").unwrap();
         let name2 = scope2.add_named("hello").unwrap();
         assert_eq!(name1, name1);
