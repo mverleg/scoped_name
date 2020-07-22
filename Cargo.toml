@@ -1,8 +1,15 @@
 [package]
 name = "scoped_name"
+description = "A small Rust library meant for tracking identifiers in nested scopes"
 version = "0.2.0"
 authors = ["Mark <mverleg.noreply@gmail.com>"]
 edition = "2018"
+license = "Apache-2.0"
+publish = true
+include = [
+    "src/**/*",
+    "Cargo.toml"
+]
 
 [dependencies]
 lazy_static = "^1.4.0"
